@@ -1,0 +1,51 @@
+
+services:
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    ports:
+      - "${AUTH_PORT:-7002}:7002"
+
+    environment:
+      DB_HOST: ${AUTH_DB_HOST:-auth-db}
+      DB_PORT: ${AUTH_DB_PORT:-5432}
+      DB_NAME: ${AUTH_DB_NAME:-auth}
+      DB_USERNAME: ${AUTH_DB_USERNAME:-postgres}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD is required}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_CONNECTION_TIMEOUT: ${DB_CONNECTION_TIMEOUT:-5}
+
+    depends_on:
+      auth-db:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  auth-db:
+    image: postgres:17-alpine
+
+    environment:
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth}
+      POSTGRES_USER: ${AUTH_DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD is required}
+
+    ports:
+      - "127.0.0.1:${AUTH_DB_EXTERNAL_PORT:-5433}:5432"
+
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+    restart: unless-stopped
+
+volumes:
+  auth_postgres_data:
